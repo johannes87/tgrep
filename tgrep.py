@@ -12,7 +12,16 @@ class BinaryLogSearch(object):
     
     def startSearch(self):
         self.__search(0, self.log_size - 1)
+
+    def close(self):
+        os.close(self.log_fd)
     
+    def __enter__(self):
+        return self
+
+    def __exit__(self, type, value, traceback):
+        self.close()
+
     def __get_next_time_tuple(self, search_pos):
         cur_pos = search_pos
 
@@ -56,9 +65,8 @@ class BinaryLogSearch(object):
 
 
 def main():
-    logSearch = BinaryLogSearch("log.txt", "%d/%b/%Y:%H:%M:%S", 20, "21/Jan/1970:18:56:40")
-    logSearch.startSearch()
-
+    with BinaryLogSearch("log.txt", "%d/%b/%Y:%H:%M:%S", 20, "21/Jan/1970:18:56:40") as logSearch:
+        logSearch.startSearch()
 
 if __name__ == '__main__':
     main()
