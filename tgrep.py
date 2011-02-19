@@ -2,60 +2,62 @@
 import os
 import time
 
-# FIXME: mit searchdatum < min(daten in logfile) findet er den 2., nicht den ersten eintrag
-
-TS_FORMAT="%d/%b/%Y:%H:%M:%S"
-TS_LENGTH=20
-LOGFILE="log.txt"
-
-def get_next_time_tuple(fd, pos, file_size):
-    cur_pos = pos
-
-    while cur_pos < file_size:
-        os.lseek(fd, cur_pos, os.SEEK_SET)
-        str = os.read(fd, TS_LENGTH)
-        try:
-            time_tuple = time.strptime(str, TS_FORMAT)
-            return (time_tuple, cur_pos + TS_LENGTH)
-        except:
-            cur_pos += 1
-
-    return (None, None)
-
-
-def binary_search(fd, search_time_tuple, start_byte, end_byte, file_size, depth=0):
-    center_byte = start_byte + (end_byte - start_byte) / 2 
-    (found_time_tuple, last_found_byte) = get_next_time_tuple(fd, center_byte, file_size)
+class BinaryLogSearch(object):
+    def __init__(self, log_path, timestamp_format, timestamp_length, search_timestamp):
+        self.log_size = os.path.getsize(log_path)
+        self.log_fd = os.open(log_path, os.O_RDONLY)
+        self.search_time_tuple = time.strptime(search_timestamp, timestamp_format)
+        self.timestamp_format = timestamp_format
+        self.timestamp_length = timestamp_length
     
-
-    if found_time_tuple == None:
-        print "no timestamp found"
-        return
+    def startSearch(self):
+        self.__search(0, self.log_size - 1)
     
-    if last_found_byte > end_byte:
-        if center_byte <= start_byte:
-            print "found nearest timestamp: {0}".format(time.strftime(TS_FORMAT, found_time_tuple))
+    def __get_next_time_tuple(self, search_pos):
+        cur_pos = search_pos
+
+        while cur_pos < self.log_size:
+            os.lseek(self.log_fd, cur_pos, os.SEEK_SET)
+            str = os.read(self.log_fd, self.timestamp_length)
+            try:
+                time_tuple = time.strptime(str, self.timestamp_format)
+                return (time_tuple, cur_pos + self.timestamp_length)
+            except:
+                cur_pos += 1
+
+        return (None, None)
+
+    def __search(self, start_byte, end_byte):
+        center_byte = start_byte + (end_byte - start_byte) / 2 
+        (found_time_tuple, last_found_byte) = self.__get_next_time_tuple(center_byte)
+        
+
+        if found_time_tuple == None:
+            print "no timestamp found"
             return
-        else:
-            binary_search(fd, search_time_tuple, start_byte, center_byte - 1, file_size, depth + 1)
+        
+        if last_found_byte > end_byte:
+            if center_byte <= start_byte:
+                print "found nearest timestamp: {0}".format(time.strftime(self.timestamp_format, found_time_tuple))
+                return
+            else:
+                self.__search(start_byte, center_byte - 1)
 
-    else:
-        if found_time_tuple == search_time_tuple:
-            print "found timestamp: {0}".format(time.strftime(TS_FORMAT, found_time_tuple))
-        elif search_time_tuple > found_time_tuple:
-            binary_search(fd, search_time_tuple, last_found_byte + 1, end_byte, file_size, depth + 1)
         else:
-            binary_search(fd, search_time_tuple, start_byte, center_byte - 1, file_size, depth + 1)
+            if found_time_tuple == self.search_time_tuple:
+                print "found timestamp: {0}".format(time.strftime(self.timestamp_format, found_time_tuple))
+            elif self.search_time_tuple > found_time_tuple:
+                self.__search(last_found_byte + 1, end_byte)
+            else:
+                self.__search(start_byte, center_byte - 1)
+
+
+
 
 
 def main():
-    fd = os.open(LOGFILE, os.O_RDONLY)
-    file_size = os.path.getsize(LOGFILE)
-
-    search_time_tuple = time.strptime("21/Jan/1970:18:56:40", "%d/%b/%Y:%H:%M:%S")
-
-    binary_search(fd, search_time_tuple, 0, file_size - 1, file_size)
-    os.close(fd)
+    logSearch = BinaryLogSearch("log.txt", "%d/%b/%Y:%H:%M:%S", 20, "21/Jan/1970:18:56:40")
+    logSearch.startSearch()
 
 
 if __name__ == '__main__':
